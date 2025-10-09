@@ -99,19 +99,23 @@ function App() {
   }
 
   return (
-    <Router>
-      <div className="min-h-screen bg-background">
-        <Header user={user} onLogin={handleLogin} onLogout={handleLogout} />
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/wallet" element={<Wallet />} />
-          <Route path="/library" element={<Library />} />
-          <Route path="/sos" element={<SOS />} />
-          <Route path="/profile" element={<Profile user={user} onLogout={handleLogout} />} />
-        </Routes>
-        <Toaster />
-      </div>
-    </Router>
+    <ThemeProvider>
+      <Router>
+        <div className="min-h-screen bg-background">
+          <Header user={user} onLogin={handleLogin} onLogout={handleLogout} />
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/wallet" element={<Wallet />} />
+            <Route path="/library" element={<Library />} />
+            <Route path="/sos" element={<SOS />} />
+            <Route path="/profile" element={<Profile user={user} onLogout={handleLogout} />} />
+            <Route path="/themes" element={<ThemeManager />} />
+            <Route path="/themes/editor/:id" element={<ThemeEditor />} />
+          </Routes>
+          <Toaster />
+        </div>
+      </Router>
+    </ThemeProvider>
   );
 }
 
