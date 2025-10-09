@@ -338,11 +338,13 @@ export const applyTheme = (theme) => {
 // Calculate contrast ratio (WCAG)
 export const getContrastRatio = (color1, color2) => {
   const getLuminance = (color) => {
+    if (!color || typeof color !== 'string') return 0;
+    
     // Convert hex to RGB
-    const hex = color.replace('#', '');
-    const r = parseInt(hex.substr(0, 2), 16) / 255;
-    const g = parseInt(hex.substr(2, 2), 16) / 255;
-    const b = parseInt(hex.substr(4, 2), 16) / 255;
+    const hex = color.replace ? color.replace('#', '') : color;
+    const r = parseInt(hex.substring(0, 2), 16) / 255;
+    const g = parseInt(hex.substring(2, 4), 16) / 255;
+    const b = parseInt(hex.substring(4, 6), 16) / 255;
     
     // Calculate relative luminance
     const [rs, gs, bs] = [r, g, b].map((c) => {
