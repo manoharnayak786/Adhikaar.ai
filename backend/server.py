@@ -1,15 +1,18 @@
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Cookie
+from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict
-from typing import List
+from pydantic import BaseModel, Field, ConfigDict, EmailStr
+from typing import List, Optional, Dict, Any
 import uuid
-from datetime import datetime, timezone
-
+from datetime import datetime, timezone, timedelta
+import hashlib
+import asyncio
+from emergentintegrations.llm.chat import LlmChat, UserMessage
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -17,58 +20,359 @@ load_dotenv(ROOT_DIR / '.env')
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+db = client.get_database(os.environ.get('DB_NAME', 'adhikaar'))
 
-# Create the main app without a prefix
+# Get LLM key
+EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', 'sk-emergent-61cC33511Fd3956926')
+
+# Create the main app
 app = FastAPI()
 
-# Create a router with the /api prefix
+# Create routers
 api_router = APIRouter(prefix="/api")
+v1_router = APIRouter(prefix="/v1")
+auth_router = APIRouter(prefix="/auth")
 
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
-# Define Models
-class StatusCheck(BaseModel):
-    model_config = ConfigDict(extra="ignore")  # Ignore MongoDB's _id field
-    
+# ====== Models ======
+
+class User(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    email: EmailStr
+    name: str
+    picture: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-class StatusCheckCreate(BaseModel):
-    client_name: str
+class Session(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    token_hash: str
+    expires_at: datetime
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-# Add your routes to the router instead of directly to app
-@api_router.get("/")
-async def root():
-    return {"message": "Hello World"}
+class AskRequest(BaseModel):
+    query: str
+    lang: str = "en"
+    context: Dict[str, Any] = {}
 
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.model_dump()
-    status_obj = StatusCheck(**status_dict)
+class AskResponse(BaseModel):
+    title: str
+    summary: str
+    steps: List[str]
+    sources: List[Dict[str, str]]
+    template: Optional[str] = None
+    updated: str = "Updated: Today"
+
+class WalletSaveRequest(BaseModel):
+    title: str
+    content: str
+    tags: List[str] = []
+
+class WalletDocument(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: Optional[str] = None
+    title: str
+    content: str
+    tags: List[str] = []
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class SessionCreateRequest(BaseModel):
+    session_token: str
+    email: EmailStr
+    name: str
+    picture: Optional[str] = None
+
+# ====== Helper Functions ======
+
+def hash_token(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+async def get_user_from_cookie(request: Request) -> Optional[User]:
+    session_token = request.cookies.get("session_token")
+    if not session_token:
+        return None
     
-    # Convert to dict and serialize datetime to ISO string for MongoDB
-    doc = status_obj.model_dump()
-    doc['timestamp'] = doc['timestamp'].isoformat()
+    token_hash = hash_token(session_token)
+    session_doc = await db.sessions.find_one({"token_hash": token_hash})
     
-    _ = await db.status_checks.insert_one(doc)
-    return status_obj
+    if not session_doc:
+        return None
+    
+    if datetime.fromisoformat(session_doc['expires_at']) < datetime.now(timezone.utc):
+        return None
+    
+    user_doc = await db.users.find_one({"id": session_doc['user_id']}, {"_id": 0})
+    if user_doc:
+        # Convert datetime strings
+        if isinstance(user_doc.get('created_at'), str):
+            user_doc['created_at'] = datetime.fromisoformat(user_doc['created_at'])
+        return User(**user_doc)
+    return None
 
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    # Exclude MongoDB's _id field from the query results
-    status_checks = await db.status_checks.find({}, {"_id": 0}).to_list(1000)
+async def search_web_for_legal_info(query: str, use_case: Optional[str] = None) -> List[Dict[str, str]]:
+    """Mock web search function - returns predefined sources"""
+    sources = [
+        {"title": "India Code - Central Acts", "url": "https://www.indiacode.nic.in/", "type": "Gov"},
+        {"title": "Ministry of Law & Justice", "url": "https://lawmin.gov.in/", "type": "Gov"},
+    ]
     
-    # Convert ISO string timestamps back to datetime objects
-    for check in status_checks:
-        if isinstance(check['timestamp'], str):
-            check['timestamp'] = datetime.fromisoformat(check['timestamp'])
+    if use_case == "traffic":
+        sources.append({"title": "Motor Vehicles Act, 1988", "url": "https://www.indiacode.nic.in/", "type": "Act"})
+    elif use_case == "consumer":
+        sources.append({"title": "Consumer Protection Act, 2019", "url": "https://consumeraffairs.nic.in/", "type": "Act"})
+    elif use_case == "police":
+        sources.append({"title": "Code of Criminal Procedure, 1973", "url": "https://www.indiacode.nic.in/", "type": "Act"})
     
-    return status_checks
+    return sources
 
-# Include the router in the main app
+# ====== Auth Routes ======
+
+@auth_router.post("/session")
+async def create_session(request: SessionCreateRequest, response: Response):
+    """Create or update user session after OAuth"""
+    try:
+        # Check if user exists
+        user_doc = await db.users.find_one({"email": request.email}, {"_id": 0})
+        
+        if user_doc:
+            user = User(**user_doc)
+        else:
+            # Create new user
+            user = User(email=request.email, name=request.name, picture=request.picture)
+            doc = user.model_dump()
+            doc['created_at'] = doc['created_at'].isoformat()
+            await db.users.insert_one(doc)
+        
+        # Create session
+        token_hash = hash_token(request.session_token)
+        expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+        
+        session = Session(user_id=user.id, token_hash=token_hash, expires_at=expires_at)
+        session_doc = session.model_dump()
+        session_doc['created_at'] = session_doc['created_at'].isoformat()
+        session_doc['expires_at'] = session_doc['expires_at'].isoformat()
+        
+        await db.sessions.insert_one(session_doc)
+        
+        # Set cookie
+        response.set_cookie(
+            key="session_token",
+            value=request.session_token,
+            httponly=True,
+            secure=True,
+            samesite="none",
+            max_age=7 * 24 * 60 * 60,
+            path="/"
+        )
+        
+        return {"user": user.model_dump(), "message": "Session created"}
+    except Exception as e:
+        logger.error(f"Session creation error: {e}")
+        raise HTTPException(status_code=500, detail="Session creation failed")
+
+@auth_router.get("/me")
+async def get_current_user(request: Request):
+    """Get current authenticated user"""
+    user = await get_user_from_cookie(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return {"user": user.model_dump()}
+
+@auth_router.post("/logout")
+async def logout(request: Request, response: Response):
+    """Logout user and clear session"""
+    session_token = request.cookies.get("session_token")
+    if session_token:
+        token_hash = hash_token(session_token)
+        await db.sessions.delete_one({"token_hash": token_hash})
+    
+    response.delete_cookie("session_token", path="/")
+    return {"message": "Logged out"}
+
+# ====== AI Q&A Routes ======
+
+@v1_router.post("/ask", response_model=AskResponse)
+async def ask_question(request: AskRequest, req: Request):
+    """AI-powered legal Q&A with citations"""
+    try:
+        user = await get_user_from_cookie(req)
+        
+        # Search for relevant sources
+        sources = await search_web_for_legal_info(request.query, request.context.get('useCase'))
+        
+        # Prepare system prompt
+        system_prompt = """You are Adhikaar.ai, an AI legal assistant for India. Your role is to:
+1. Provide accurate, cited legal guidance based on Indian laws
+2. Use simple, accessible language
+3. Structure answers as: Summary -> Steps -> Template (if applicable) -> Sources
+4. Always cite specific laws, sections, and official sources
+5. Avoid definitive legal advice; provide general guidance
+6. Mention jurisdiction (India) and last updated date
+
+Keep responses concise, actionable, and fact-based."""
+        
+        # Create LLM chat instance
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=str(uuid.uuid4()),
+            system_message=system_prompt
+        ).with_model("openai", "gpt-4o-mini")
+        
+        # Create user message with context
+        sources_text = "\n".join([f"- {s['title']} ({s['url']})" for s in sources])
+        prompt = f"""Question: {request.query}
+
+Use Case: {request.context.get('useCase', 'general')}
+
+Available sources:
+{sources_text}
+
+Provide:
+1. A clear title (max 80 chars)
+2. A summary (2-3 sentences)
+3. 3-5 actionable steps
+4. If applicable, a simple template with [placeholders]
+
+Format your response as a structured answer."""
+        
+        user_message = UserMessage(text=prompt)
+        
+        # Get AI response with timeout
+        try:
+            ai_response = await asyncio.wait_for(chat.send_message(user_message), timeout=5.0)
+        except asyncio.TimeoutError:
+            raise HTTPException(status_code=504, detail="AI response timeout")
+        
+        # Parse response (simplified)
+        response_text = ai_response if isinstance(ai_response, str) else str(ai_response)
+        
+        # Extract structured data (basic parsing)
+        lines = response_text.split('\n')
+        title = request.query[:80] if len(request.query) <= 80 else request.query[:77] + "..."
+        summary = response_text[:200]
+        steps = []
+        
+        for line in lines:
+            if line.strip().startswith(('1.', '2.', '3.', '4.', '5.', '-')):
+                steps.append(line.strip())
+        
+        if not steps:
+            steps = [
+                "Review the relevant laws and regulations",
+                "Gather all necessary documentation",
+                "Consult with appropriate authorities if needed",
+                "Follow prescribed legal procedures"
+            ]
+        
+        result = AskResponse(
+            title=title,
+            summary=summary,
+            steps=steps[:5],
+            sources=sources,
+            template=None
+        )
+        
+        # Log the query
+        log_doc = {
+            "id": str(uuid.uuid4()),
+            "user_id": user.id if user else None,
+            "query": request.query,
+            "lang": request.lang,
+            "use_case": request.context.get('useCase'),
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.ask_logs.insert_one(log_doc)
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Ask error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to process query: {str(e)}")
+
+# ====== Wallet Routes ======
+
+@v1_router.post("/wallet/save")
+async def save_to_wallet(request: WalletSaveRequest, req: Request):
+    """Save document to wallet"""
+    user = await get_user_from_cookie(req)
+    
+    doc = WalletDocument(
+        user_id=user.id if user else None,
+        title=request.title,
+        content=request.content,
+        tags=request.tags
+    )
+    
+    doc_dict = doc.model_dump()
+    doc_dict['created_at'] = doc_dict['created_at'].isoformat()
+    
+    await db.wallet_docs.insert_one(doc_dict)
+    return {"id": doc.id, "message": "Saved to wallet"}
+
+@v1_router.get("/wallet/list")
+async def list_wallet_docs(req: Request):
+    """List wallet documents"""
+    user = await get_user_from_cookie(req)
+    
+    query = {"user_id": user.id} if user else {}
+    docs = await db.wallet_docs.find(query, {"_id": 0}).to_list(100)
+    
+    return {"documents": docs}
+
+@v1_router.delete("/wallet/{doc_id}")
+async def delete_wallet_doc(doc_id: str, req: Request):
+    """Delete wallet document"""
+    user = await get_user_from_cookie(req)
+    
+    result = await db.wallet_docs.delete_one({"id": doc_id, "user_id": user.id if user else None})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    return {"message": "Document deleted"}
+
+# ====== Library Routes ======
+
+@v1_router.get("/library/search")
+async def search_library(q: str = ""):
+    """Search legal library"""
+    # Mock implementation
+    items = [
+        {
+            "id": "1",
+            "title": "Motor Vehicles Act, 1988",
+            "snippet": "The Motor Vehicles Act regulates all aspects of road transport vehicles...",
+            "url": "https://www.indiacode.nic.in/",
+            "source_type": "Act",
+            "tags": ["traffic", "transport"]
+        },
+        {
+            "id": "2",
+            "title": "Consumer Protection Act, 2019",
+            "snippet": "An Act to provide for protection of the interests of consumers...",
+            "url": "https://consumeraffairs.nic.in/",
+            "source_type": "Act",
+            "tags": ["consumer", "rights"]
+        }
+    ]
+    
+    if q:
+        items = [item for item in items if q.lower() in item['title'].lower() or q.lower() in item['snippet'].lower()]
+    
+    return {"results": items}
+
+# Include routers
+api_router.include_router(v1_router)
+api_router.include_router(auth_router)
 app.include_router(api_router)
 
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
@@ -76,13 +380,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
