@@ -1,62 +1,62 @@
 [
   {
     "content": "Create theme data models and localStorage utilities for theme persistence",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Build ThemeProvider context with theme switching logic",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Create 4 preset themes: Mint, Success, Indigo, Warning with all design tokens",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Build ThemeManager page with gallery view of theme cards",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Add theme actions: Preview, Set Default, Duplicate, Edit, Delete (soft)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Build ThemeEditor page with token editing fields and contrast meters",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Add live component preview panel in ThemeEditor",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Implement QuickSwitcher in header/avatar menu",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Add Export/Import theme functionality (.adhikaar-theme.json)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Build DeleteThemeDialog with soft delete and undo toast",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Add backend API routes for theme CRUD operations",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Implement WCAG contrast checker with AA/AAA indicators",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Add light/dark/high contrast mode support",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Update routing to include /themes and /themes/editor routes",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Test theme switching across all pages and components",
-    "status": "pending"
+    "status": "in_progress"
   }
 ]
