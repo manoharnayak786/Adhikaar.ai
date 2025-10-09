@@ -51,6 +51,47 @@ export const Header = ({ user, onLogin, onLogout }) => {
           </span>
         </div>
         <div className="flex items-center gap-2">
+          {/* Theme Switcher */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="hidden md:flex items-center gap-2"
+                data-testid="header-theme-button"
+              >
+                <Palette className="h-4 w-4" />
+                <span className="hidden lg:inline">Theme</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel>Switch Theme</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {themes.slice(0, 4).map((theme) => (
+                <DropdownMenuItem
+                  key={theme.id}
+                  onClick={() => switchTheme(theme.id)}
+                  className={activeThemeId === theme.id ? 'bg-accent' : ''}
+                  data-testid={`theme-option-${theme.id}`}
+                >
+                  <div className="flex items-center gap-2 w-full">
+                    <div
+                      className="h-4 w-4 rounded-sm border"
+                      style={{ backgroundColor: theme.tokens['brand.primary'] }}
+                    />
+                    <span className="flex-1">{theme.displayName}</span>
+                    {activeThemeId === theme.id && <ShieldCheck className="h-3 w-3" />}
+                  </div>
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => navigate('/themes')}>
+                <Palette className="h-4 w-4 mr-2" />
+                Manage Themes
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           {user ? (
             <>
               <Button
