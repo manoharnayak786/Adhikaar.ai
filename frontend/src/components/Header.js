@@ -1,8 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Logo } from './Logo';
-import { ShieldCheck, Sun, LogOut, User } from 'lucide-react';
+import { ShieldCheck, Sun, LogOut, User, Palette } from 'lucide-react';
 import { Button } from './ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu';
+import { useTheme } from '../contexts/ThemeContext';
 
 export const Header = ({ user, onLogin, onLogout }) => {
   const navigate = useNavigate();
