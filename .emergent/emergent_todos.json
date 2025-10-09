@@ -1,7 +1,7 @@
 [
   {
     "content": "Create theme data models and localStorage utilities for theme persistence",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Build ThemeProvider context with theme switching logic",
