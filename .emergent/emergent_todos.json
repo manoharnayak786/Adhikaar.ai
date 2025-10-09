@@ -1,0 +1,70 @@
+[
+  {
+    "content": "Install required dependencies: framer-motion for animations and emergentintegrations for AI",
+    "status": "pending"
+  },
+  {
+    "content": "Update index.css with design tokens from design_guidelines.md and add EB Garamond + Inter fonts",
+    "status": "pending"
+  },
+  {
+    "content": "Create SVG logo component representing shield + scale of justice integrated with letter A",
+    "status": "pending"
+  },
+  {
+    "content": "Build Header component with logo, Secure badge, 24/7 badge, Login/Start buttons",
+    "status": "pending"
+  },
+  {
+    "content": "Create Home page with hero section, search bar, use-case chips, and trust elements",
+    "status": "pending"
+  },
+  {
+    "content": "Build AnswerBlock component with expandable sources accordion",
+    "status": "pending"
+  },
+  {
+    "content": "Create TemplateCard component with copy/download functionality",
+    "status": "pending"
+  },
+  {
+    "content": "Build CaseWallet page with Documents and Timeline tabs",
+    "status": "pending"
+  },
+  {
+    "content": "Create SOSPanel component with verified helplines",
+    "status": "pending"
+  },
+  {
+    "content": "Build RightsLibrary page with search functionality",
+    "status": "pending"
+  },
+  {
+    "content": "Setup React Router with routes: /, /wallet, /library, /sos, /profile",
+    "status": "pending"
+  },
+  {
+    "content": "Setup backend with MongoDB models (User, Session, WalletDoc, Template, LibraryEntry, AskLog)",
+    "status": "pending"
+  },
+  {
+    "content": "Install emergentintegrations in backend and configure with EMERGENT_LLM_KEY",
+    "status": "pending"
+  },
+  {
+    "content": "Create backend API routes: /api/v1/ask, /api/v1/library/search, /api/v1/wallet/*, /api/auth/*",
+    "status": "pending"
+  },
+  {
+    "content": "Implement AI Q&A with web search citations using emergentintegrations LlmChat",
+    "status": "pending"
+  },
+  {
+    "content": "Integrate Emergent Google OAuth authentication (frontend + backend session management)",
+    "status": "pending"
+  },
+  {
+    "content": "Take screenshot and verify UI matches design guidelines",
+    "status": "pending"
+  }
+]
