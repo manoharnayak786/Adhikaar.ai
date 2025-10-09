@@ -1,53 +1,114 @@
-import { useEffect } from "react";
-import "@/App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import axios from "axios";
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Header } from './components/Header';
+import { Toaster } from './components/ui/sonner';
+import Home from './pages/Home';
+import Wallet from './pages/Wallet';
+import Library from './pages/Library';
+import SOS from './pages/SOS';
+import Profile from './pages/Profile';
+import axios from 'axios';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+const AUTH_URL = 'https://auth.emergentagent.com';
+const SESSION_DATA_URL = 'https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data';
 
-const Home = () => {
-  const helloWorldApi = async () => {
+function App() {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Check for session_id in URL fragment (after OAuth)
+    const hash = window.location.hash;
+    if (hash.includes('session_id=')) {
+      const sessionId = hash.split('session_id=')[1].split('&')[0];
+      handleSessionId(sessionId);
+      // Clean URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else {
+      // Check for existing session
+      checkSession();
+    }
+  }, []);
+
+  const handleSessionId = async (sessionId) => {
     try {
-      const response = await axios.get(`${API}/`);
-      console.log(response.data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
+      // Get session data from Emergent
+      const response = await axios.get(SESSION_DATA_URL, {
+        headers: { 'X-Session-ID': sessionId },
+      });
+
+      const { email, name, picture, session_token } = response.data;
+
+      // Send session to backend
+      const backendResponse = await axios.post(
+        `${BACKEND_URL}/api/auth/session`,
+        {
+          session_token,
+          email,
+          name,
+          picture,
+        },
+        { withCredentials: true }
+      );
+
+      setUser(backendResponse.data.user);
+    } catch (error) {
+      console.error('Session error:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  useEffect(() => {
-    helloWorldApi();
-  }, []);
+  const checkSession = async () => {
+    try {
+      const response = await axios.get(`${BACKEND_URL}/api/auth/me`, {
+        withCredentials: true,
+      });
+      setUser(response.data.user);
+    } catch (error) {
+      // Not authenticated
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogin = () => {
+    const redirectUrl = `${window.location.origin}/`;
+    window.location.href = `${AUTH_URL}?redirect=${encodeURIComponent(redirectUrl)}`;
+  };
+
+  const handleLogout = async () => {
+    try {
+      await axios.post(`${BACKEND_URL}/api/auth/logout`, {}, { withCredentials: true });
+      setUser(null);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-muted-foreground">Loading...</div>
+      </div>
+    );
+  }
 
   return (
-    <div>
-      <header className="App-header">
-        <a
-          className="App-link"
-          href="https://emergent.sh"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
-        </a>
-        <p className="mt-5">Building something incredible ~!</p>
-      </header>
-    </div>
-  );
-};
-
-function App() {
-  return (
-    <div className="App">
-      <BrowserRouter>
+    <Router>
+      <div className="min-h-screen bg-background">
+        <Header user={user} onLogin={handleLogin} onLogout={handleLogout} />
         <Routes>
-          <Route path="/" element={<Home />}>
-            <Route index element={<Home />} />
-          </Route>
+          <Route path="/" element={<Home />} />
+          <Route path="/wallet" element={<Wallet />} />
+          <Route path="/library" element={<Library />} />
+          <Route path="/sos" element={<SOS />} />
+          <Route path="/profile" element={<Profile user={user} onLogout={handleLogout} />} />
         </Routes>
-      </BrowserRouter>
-    </div>
+        <Toaster />
+      </div>
+    </Router>
   );
 }
 
