@@ -1,74 +1,62 @@
 [
   {
-    "content": "Install required dependencies: framer-motion for animations and emergentintegrations for AI",
-    "status": "completed"
+    "content": "Create theme data models and localStorage utilities for theme persistence",
+    "status": "pending"
   },
   {
-    "content": "Update index.css with design tokens from design_guidelines.md and add EB Garamond + Inter fonts",
-    "status": "completed"
+    "content": "Build ThemeProvider context with theme switching logic",
+    "status": "pending"
   },
   {
-    "content": "Create SVG logo component representing shield + scale of justice integrated with letter A",
-    "status": "completed"
+    "content": "Create 4 preset themes: Mint, Success, Indigo, Warning with all design tokens",
+    "status": "pending"
   },
   {
-    "content": "Build Header component with logo, Secure badge, 24/7 badge, Login/Start buttons",
-    "status": "completed"
+    "content": "Build ThemeManager page with gallery view of theme cards",
+    "status": "pending"
   },
   {
-    "content": "Create Home page with hero section, search bar, use-case chips, and trust elements",
-    "status": "completed"
+    "content": "Add theme actions: Preview, Set Default, Duplicate, Edit, Delete (soft)",
+    "status": "pending"
   },
   {
-    "content": "Build AnswerBlock component with expandable sources accordion",
-    "status": "completed"
+    "content": "Build ThemeEditor page with token editing fields and contrast meters",
+    "status": "pending"
   },
   {
-    "content": "Create TemplateCard component with copy/download functionality",
-    "status": "completed"
+    "content": "Add live component preview panel in ThemeEditor",
+    "status": "pending"
   },
   {
-    "content": "Build CaseWallet page with Documents and Timeline tabs",
-    "status": "completed"
+    "content": "Implement QuickSwitcher in header/avatar menu",
+    "status": "pending"
   },
   {
-    "content": "Create SOSPanel component with verified helplines",
-    "status": "completed"
+    "content": "Add Export/Import theme functionality (.adhikaar-theme.json)",
+    "status": "pending"
   },
   {
-    "content": "Build RightsLibrary page with search functionality",
-    "status": "completed"
+    "content": "Build DeleteThemeDialog with soft delete and undo toast",
+    "status": "pending"
   },
   {
-    "content": "Setup React Router with routes: /, /wallet, /library, /sos, /profile",
-    "status": "completed"
+    "content": "Add backend API routes for theme CRUD operations",
+    "status": "pending"
   },
   {
-    "content": "Setup backend with MongoDB models (User, Session, WalletDoc, Template, LibraryEntry, AskLog)",
-    "status": "completed"
+    "content": "Implement WCAG contrast checker with AA/AAA indicators",
+    "status": "pending"
   },
   {
-    "content": "Install emergentintegrations in backend and configure with EMERGENT_LLM_KEY",
-    "status": "completed"
+    "content": "Add light/dark/high contrast mode support",
+    "status": "pending"
   },
   {
-    "content": "Create backend API routes: /api/v1/ask, /api/v1/library/search, /api/v1/wallet/*, /api/auth/*",
-    "status": "completed"
+    "content": "Update routing to include /themes and /themes/editor routes",
+    "status": "pending"
   },
   {
-    "content": "Implement AI Q&A with web search citations using emergentintegrations LlmChat",
-    "status": "completed"
-  },
-  {
-    "content": "Integrate Emergent Google OAuth authentication (frontend + backend session management)",
-    "status": "completed"
-  },
-  {
-    "content": "Restart services and verify everything is working",
-    "status": "completed"
-  },
-  {
-    "content": "Take screenshot and verify UI matches design guidelines",
-    "status": "completed"
+    "content": "Test theme switching across all pages and components",
+    "status": "pending"
   }
 ]
