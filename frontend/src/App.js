@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { Header } from './components/Header';
 import { Toaster } from './components/ui/sonner';
 import Home from './pages/Home';
@@ -7,6 +8,8 @@ import Wallet from './pages/Wallet';
 import Library from './pages/Library';
 import SOS from './pages/SOS';
 import Profile from './pages/Profile';
+import ThemeManager from './pages/ThemeManager';
+import ThemeEditor from './pages/ThemeEditor';
 import axios from 'axios';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
