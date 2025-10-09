@@ -65,10 +65,10 @@
   },
   {
     "content": "Restart services and verify everything is working",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Take screenshot and verify UI matches design guidelines",
-    "status": "pending"
+    "status": "completed"
   }
 ]
