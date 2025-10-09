@@ -16,6 +16,7 @@ import { useTheme } from '../contexts/ThemeContext';
 export const Header = ({ user, onLogin, onLogout }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { themes, activeThemeId, switchTheme } = useTheme();
 
   return (
     <header
