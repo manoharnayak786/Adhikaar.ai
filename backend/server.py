@@ -367,6 +367,128 @@ async def search_library(q: str = ""):
     
     return {"results": items}
 
+# ====== Theme Routes ======
+
+class ThemeCreateRequest(BaseModel):
+    name: str
+    tokens: Dict[str, Any]
+    scope: str = "user"
+
+class ThemeUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    tokens: Optional[Dict[str, Any]] = None
+
+class Theme(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    tokens: Dict[str, Any]
+    owner_id: Optional[str] = None
+    scope: str = "user"
+    visibility: str = "private"
+    status: str = "published"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    deleted_at: Optional[datetime] = None
+    version: str = "1.0.0"
+
+@v1_router.get("/themes")
+async def get_themes(req: Request, scope: str = "user"):
+    """Get all themes for user"""
+    user = await get_user_from_cookie(req)
+    
+    query = {"scope": scope, "status": {"$ne": "deleted"}}
+    if user:
+        query["owner_id"] = user.id
+    
+    themes = await db.themes.find(query, {"_id": 0}).to_list(100)
+    
+    return {"themes": themes}
+
+@v1_router.post("/themes")
+async def create_theme(request: ThemeCreateRequest, req: Request):
+    """Create new theme"""
+    user = await get_user_from_cookie(req)
+    
+    theme = Theme(
+        name=request.name,
+        tokens=request.tokens,
+        owner_id=user.id if user else None,
+        scope=request.scope
+    )
+    
+    theme_dict = theme.model_dump()
+    theme_dict['created_at'] = theme_dict['created_at'].isoformat()
+    theme_dict['updated_at'] = theme_dict['updated_at'].isoformat()
+    
+    await db.themes.insert_one(theme_dict)
+    
+    return {"theme": theme.model_dump()}
+
+@v1_router.put("/themes/{theme_id}")
+async def update_theme(theme_id: str, request: ThemeUpdateRequest, req: Request):
+    """Update theme"""
+    user = await get_user_from_cookie(req)
+    
+    update_data = {}
+    if request.name:
+        update_data['name'] = request.name
+    if request.tokens:
+        update_data['tokens'] = request.tokens
+    update_data['updated_at'] = datetime.now(timezone.utc).isoformat()
+    
+    result = await db.themes.update_one(
+        {"id": theme_id, "owner_id": user.id if user else None},
+        {"$set": update_data}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Theme not found")
+    
+    theme = await db.themes.find_one({"id": theme_id}, {"_id": 0})
+    return {"theme": theme}
+
+@v1_router.delete("/themes/{theme_id}")
+async def delete_theme_api(theme_id: str, req: Request):
+    """Soft delete theme"""
+    user = await get_user_from_cookie(req)
+    
+    result = await db.themes.update_one(
+        {"id": theme_id, "owner_id": user.id if user else None},
+        {
+            "$set": {
+                "status": "deleted",
+                "deleted_at": datetime.now(timezone.utc).isoformat()
+            }
+        }
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Theme not found")
+    
+    return {"ok": True}
+
+@v1_router.post("/themes/{theme_id}/restore")
+async def restore_theme_api(theme_id: str, req: Request):
+    """Restore deleted theme"""
+    user = await get_user_from_cookie(req)
+    
+    result = await db.themes.update_one(
+        {"id": theme_id, "owner_id": user.id if user else None},
+        {
+            "$set": {
+                "status": "published",
+                "deleted_at": None
+            }
+        }
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Theme not found")
+    
+    theme = await db.themes.find_one({"id": theme_id}, {"_id": 0})
+    return {"theme": theme}
+
 # Include routers
 api_router.include_router(v1_router)
 api_router.include_router(auth_router)
