@@ -1,7 +1,7 @@
 [
   {
     "content": "Install required dependencies: framer-motion for animations and emergentintegrations for AI",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Update index.css with design tokens from design_guidelines.md and add EB Garamond + Inter fonts",
