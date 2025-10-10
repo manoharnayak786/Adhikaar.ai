@@ -101,3 +101,85 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: "Test the backend AI integration for the Adhikaar.ai legal assistant application"
+
+backend:
+  - task: "AI Ask Endpoint Integration"
+    implemented: true
+    working: false
+    file: "/app/backend/server.py"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: false
+          agent: "testing"
+          comment: "CRITICAL ISSUE: AI integration is functional but timeout handling is broken. LLM responses take 8-12 seconds but 5-second timeout is not being enforced. Fixed asyncio.TimeoutError import but emergentintegrations library may not respect asyncio cancellation. Core functionality works: proper response structure, valid AI content generation, correct API endpoints."
+        
+  - task: "AI Response Structure Validation"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "Response structure is fully compliant with AskResponse model. All required fields (title, summary, steps, sources, updated) are present with correct data types. Sources include proper government and legal act references."
+
+  - task: "LLM Integration Core Functionality"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "LLM integration with emergentintegrations is working correctly. GPT-4o-mini model generates meaningful legal content, proper citations, and actionable steps. Backend logs show successful LiteLLM completion calls."
+
+  - task: "API Endpoint Accessibility"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "POST /api/v1/ask endpoint is accessible and returns HTTP 200. Accepts proper JSON payload with query, lang, and context fields. CORS and routing configured correctly."
+
+frontend:
+  - task: "Frontend Integration Testing"
+    implemented: false
+    working: "NA"
+    file: "N/A"
+    stuck_count: 0
+    priority: "low"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+          agent: "testing"
+          comment: "Frontend testing not performed as per testing agent guidelines - backend focus only."
+
+metadata:
+  created_by: "testing_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "AI Ask Endpoint Integration"
+  stuck_tasks:
+    - "AI Ask Endpoint Integration"
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+    - agent: "testing"
+      message: "AI integration testing completed. CRITICAL ISSUE FOUND: Timeout handling is not working properly - responses take 8-12 seconds instead of the configured 5-second limit. Core AI functionality is working correctly with proper response structure and meaningful content generation. The emergentintegrations library may not be respecting asyncio cancellation. This needs immediate attention as it affects user experience and could cause client-side timeouts."
