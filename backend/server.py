@@ -246,7 +246,7 @@ Format your response as a structured answer."""
         # Get AI response with timeout
         try:
             ai_response = await asyncio.wait_for(chat.send_message(user_message), timeout=5.0)
-        except asyncio.TimeoutError:
+        except asyncio.exceptions.TimeoutError:
             raise HTTPException(status_code=504, detail="AI response timeout")
         
         # Parse response (simplified)
