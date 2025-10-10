@@ -244,10 +244,12 @@ Format your response as a structured answer."""
         user_message = UserMessage(text=prompt)
         
         # Get AI response with timeout
+        # Note: emergentintegrations uses litellm internally which may not respect
+        # asyncio cancellation during streaming. Timeout increased to 15s for MVP.
         try:
-            ai_response = await asyncio.wait_for(chat.send_message(user_message), timeout=5.0)
-        except asyncio.exceptions.TimeoutError:
-            raise HTTPException(status_code=504, detail="AI response timeout")
+            ai_response = await asyncio.wait_for(chat.send_message(user_message), timeout=15.0)
+        except (asyncio.TimeoutError, TimeoutError):
+            raise HTTPException(status_code=504, detail="AI response timeout - please try again")
         
         # Parse response (simplified)
         response_text = ai_response if isinstance(ai_response, str) else str(ai_response)
