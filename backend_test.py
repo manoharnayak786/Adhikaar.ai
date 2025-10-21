@@ -599,6 +599,9 @@ class BackendTester:
         self.test_ai_ask_general_legal()
         self.test_ai_response_structure()
         self.test_ai_timeout_handling()
+        self.test_rate_limiting()
+        self.test_error_handling()
+        self.test_web_search_integration()
         self.test_llm_integration()
         
         # Summary
