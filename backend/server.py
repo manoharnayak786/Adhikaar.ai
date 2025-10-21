@@ -391,9 +391,9 @@ Respond ONLY with the JSON object, no additional text."""
         log_doc = {
             "id": str(uuid.uuid4()),
             "user_id": user.id if user else None,
-            "query": request.query,
-            "lang": request.lang,
-            "use_case": request.context.get('useCase'),
+            "query": ask_request.query,
+            "lang": ask_request.lang,
+            "use_case": ask_request.context.get('useCase'),
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         await db.ask_logs.insert_one(log_doc)
