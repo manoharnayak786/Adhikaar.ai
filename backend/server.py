@@ -287,9 +287,9 @@ IMPORTANT: You must respond with a valid JSON object with this exact structure:
         
         # Create user message with context
         sources_text = "\n".join([f"- {s['title']}" for s in sources[:3]])
-        prompt = f"""Question: {request.query}
+        prompt = f"""Question: {ask_request.query}
 
-Use Case: {request.context.get('useCase', 'general')}
+Use Case: {ask_request.context.get('useCase', 'general')}
 
 Reference sources available:
 {sources_text}
