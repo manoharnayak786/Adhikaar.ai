@@ -3,8 +3,9 @@ import { SearchBar } from '../components/SearchBar';
 import { UseCaseChips } from '../components/UseCaseChips';
 import { AnswerBlock } from '../components/AnswerBlock';
 import { SOSPanel } from '../components/SOSPanel';
-import { ShieldCheck, Zap, Lock } from 'lucide-react';
+import { ShieldCheck, Zap, Lock, AlertCircle } from 'lucide-react';
 import axios from 'axios';
+import { toast } from 'sonner';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -12,9 +13,13 @@ export default function Home() {
   const [selectedCase, setSelectedCase] = useState(null);
   const [answer, setAnswer] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const handleSearch = async (query) => {
     setLoading(true);
+    setError(null);
+    setAnswer(null);
+    
     try {
       const response = await axios.post(`${BACKEND_URL}/api/v1/ask`, {
         query,
@@ -22,24 +27,30 @@ export default function Home() {
         context: { useCase: selectedCase },
       });
       setAnswer(response.data);
+      toast.success('Answer generated successfully!');
     } catch (error) {
       console.error('Search error:', error);
-      // Show mock answer for demo
-      setAnswer({
-        title: 'Understanding Your Legal Rights',
-        summary: query,
-        steps: [
-          'Review the relevant laws and regulations',
-          'Gather all necessary documentation',
-          'Consult with the appropriate authorities',
-          'Follow the prescribed legal procedure',
-        ],
-        sources: [
-          { title: 'India Code Portal', url: 'https://www.indiacode.nic.in/', type: 'Gov' },
-          { title: 'Ministry of Law & Justice', url: 'https://lawmin.gov.in/', type: 'Gov' },
-        ],
-        updated: 'Updated: Today',
-      });
+      
+      let errorMessage = 'Failed to process your question. Please try again.';
+      
+      if (error.response) {
+        // Server responded with error
+        if (error.response.status === 429) {
+          errorMessage = 'Too many requests. Please wait a moment and try again.';
+        } else if (error.response.status === 504) {
+          errorMessage = 'The request timed out. Please try with a simpler question.';
+        } else if (error.response.status === 400) {
+          errorMessage = error.response.data?.detail || 'Invalid question. Please check your input.';
+        } else if (error.response.data?.detail) {
+          errorMessage = error.response.data.detail;
+        }
+      } else if (error.request) {
+        // Request made but no response
+        errorMessage = 'Unable to connect to the server. Please check your internet connection.';
+      }
+      
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
