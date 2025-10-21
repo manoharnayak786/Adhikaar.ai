@@ -331,7 +331,7 @@ Respond ONLY with the JSON object, no additional text."""
             parsed_data = json.loads(response_text)
             
             # Validate required fields
-            title = parsed_data.get('title', request.query[:80])
+            title = parsed_data.get('title', ask_request.query[:80])
             summary = parsed_data.get('summary', '')
             steps = parsed_data.get('steps', [])
             template = parsed_data.get('template')
@@ -350,7 +350,7 @@ Respond ONLY with the JSON object, no additional text."""
             
             # Fallback: Basic text parsing
             lines = response_text.split('\n')
-            title = request.query[:80] if len(request.query) <= 80 else request.query[:77] + "..."
+            title = ask_request.query[:80] if len(ask_request.query) <= 80 else ask_request.query[:77] + "..."
             
             # Extract summary (first paragraph)
             summary_lines = []
