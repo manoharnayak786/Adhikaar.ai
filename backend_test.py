@@ -11,7 +11,7 @@ import sys
 from typing import Dict, Any, List
 
 # Backend URL from frontend/.env
-BACKEND_URL = "https://repo-troubleshoot-1.preview.emergentagent.com"
+BACKEND_URL = "https://repo-analyzer-101.preview.emergentagent.com"
 API_BASE = f"{BACKEND_URL}/api/v1"
 
 class BackendTester:
