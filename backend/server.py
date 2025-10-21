@@ -246,7 +246,7 @@ async def logout(request: Request, response: Response):
 
 @v1_router.post("/ask", response_model=AskResponse)
 @limiter.limit("10/minute")
-async def ask_question(req: Request, request: AskRequest):
+async def ask_question(request: Request, ask_request: AskRequest):
     """AI-powered legal Q&A with citations (Rate limited: 10 requests/minute)"""
     try:
         user = await get_user_from_cookie(req)
