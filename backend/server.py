@@ -27,11 +27,18 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client.get_database(os.environ.get('DB_NAME', 'adhikaar'))
 
-# Get LLM key
+# Get API keys
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', 'sk-emergent-61cC33511Fd3956926')
+GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY', '')
+GOOGLE_CSE_ID = os.environ.get('GOOGLE_CSE_ID', '')
 
 # Create the main app
 app = FastAPI()
+
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Create routers
 api_router = APIRouter(prefix="/api")
