@@ -140,8 +140,25 @@ export default function Home() {
                   <div className="h-4 w-5/6 bg-accent/40 rounded animate-pulse" />
                 </div>
               )}
-              {answer && !loading && <AnswerBlock answer={answer} onSave={handleSaveToWallet} />}
-              {!answer && !loading && (
+              {error && !loading && (
+                <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-6" data-testid="answer-error">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h3 className="font-semibold text-destructive mb-1">Error Processing Question</h3>
+                      <p className="text-sm text-muted-foreground">{error}</p>
+                      <button
+                        onClick={() => setError(null)}
+                        className="mt-3 text-sm text-primary hover:underline"
+                      >
+                        Try another question
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {answer && !loading && !error && <AnswerBlock answer={answer} onSave={handleSaveToWallet} />}
+              {!answer && !loading && !error && (
                 <div className="text-center py-16" data-testid="answer-empty-state">
                   <p className="text-muted-foreground">
                     Ask a question to get started with your legal query
