@@ -231,9 +231,9 @@ metadata:
 
 test_plan:
   current_focus:
-    - "AI Ask Endpoint Integration"
+    - "Rate Limiting Implementation"
   stuck_tasks:
-    - "AI Ask Endpoint Integration"
+    - "Rate Limiting Implementation"
   test_all: false
   test_priority: "high_first"
 
