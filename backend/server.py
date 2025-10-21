@@ -245,24 +245,38 @@ async def logout(request: Request, response: Response):
 # ====== AI Q&A Routes ======
 
 @v1_router.post("/ask", response_model=AskResponse)
+@limiter.limit("10/minute")
 async def ask_question(request: AskRequest, req: Request):
-    """AI-powered legal Q&A with citations"""
+    """AI-powered legal Q&A with citations (Rate limited: 10 requests/minute)"""
     try:
         user = await get_user_from_cookie(req)
+        
+        # Validate input
+        if not request.query or len(request.query.strip()) == 0:
+            raise HTTPException(status_code=400, detail="Query cannot be empty")
+        
+        if len(request.query) > 1000:
+            raise HTTPException(status_code=400, detail="Query too long (max 1000 characters)")
         
         # Search for relevant sources
         sources = await search_web_for_legal_info(request.query, request.context.get('useCase'))
         
-        # Prepare system prompt
+        # Prepare system prompt with JSON output instruction
         system_prompt = """You are Adhikaar.ai, an AI legal assistant for India. Your role is to:
 1. Provide accurate, cited legal guidance based on Indian laws
 2. Use simple, accessible language
-3. Structure answers as: Summary -> Steps -> Template (if applicable) -> Sources
+3. Structure answers clearly with title, summary, and actionable steps
 4. Always cite specific laws, sections, and official sources
 5. Avoid definitive legal advice; provide general guidance
-6. Mention jurisdiction (India) and last updated date
+6. Mention jurisdiction (India) when relevant
 
-Keep responses concise, actionable, and fact-based."""
+IMPORTANT: You must respond with a valid JSON object with this exact structure:
+{
+  "title": "Brief title (max 80 chars)",
+  "summary": "Clear 2-3 sentence summary",
+  "steps": ["Step 1", "Step 2", "Step 3"],
+  "template": "Optional template with [placeholders] or null"
+}"""
         
         # Create LLM chat instance
         chat = LlmChat(
@@ -272,59 +286,105 @@ Keep responses concise, actionable, and fact-based."""
         ).with_model("openai", "gpt-4o-mini")
         
         # Create user message with context
-        sources_text = "\n".join([f"- {s['title']} ({s['url']})" for s in sources])
+        sources_text = "\n".join([f"- {s['title']}" for s in sources[:3]])
         prompt = f"""Question: {request.query}
 
 Use Case: {request.context.get('useCase', 'general')}
 
-Available sources:
+Reference sources available:
 {sources_text}
 
-Provide:
+Provide a JSON response with:
 1. A clear title (max 80 chars)
-2. A summary (2-3 sentences)
-3. 3-5 actionable steps
-4. If applicable, a simple template with [placeholders]
+2. A summary (2-3 sentences explaining the legal guidance)
+3. 3-5 actionable steps the person should take
+4. A template if applicable (with [placeholders] for user to fill in), otherwise null
 
-Format your response as a structured answer."""
+Respond ONLY with the JSON object, no additional text."""
         
         user_message = UserMessage(text=prompt)
         
         # Get AI response with timeout
-        # Note: emergentintegrations uses litellm internally which may not respect
-        # asyncio cancellation during streaming. Timeout increased to 15s for MVP.
         try:
-            ai_response = await asyncio.wait_for(chat.send_message(user_message), timeout=15.0)
+            ai_response = await asyncio.wait_for(chat.send_message(user_message), timeout=20.0)
         except (asyncio.TimeoutError, TimeoutError):
-            raise HTTPException(status_code=504, detail="AI response timeout - please try again")
+            raise HTTPException(
+                status_code=504, 
+                detail="The AI is taking longer than expected. Please try again with a simpler question."
+            )
         
-        # Parse response (simplified)
+        # Parse response
         response_text = ai_response if isinstance(ai_response, str) else str(ai_response)
         
-        # Extract structured data (basic parsing)
-        lines = response_text.split('\n')
-        title = request.query[:80] if len(request.query) <= 80 else request.query[:77] + "..."
-        summary = response_text[:200]
-        steps = []
-        
-        for line in lines:
-            if line.strip().startswith(('1.', '2.', '3.', '4.', '5.', '-')):
-                steps.append(line.strip())
-        
-        if not steps:
-            steps = [
-                "Review the relevant laws and regulations",
-                "Gather all necessary documentation",
-                "Consult with appropriate authorities if needed",
-                "Follow prescribed legal procedures"
-            ]
+        # Try to parse as JSON
+        try:
+            # Extract JSON if wrapped in markdown code blocks
+            if '```json' in response_text:
+                json_start = response_text.find('```json') + 7
+                json_end = response_text.find('```', json_start)
+                response_text = response_text[json_start:json_end].strip()
+            elif '```' in response_text:
+                json_start = response_text.find('```') + 3
+                json_end = response_text.find('```', json_start)
+                response_text = response_text[json_start:json_end].strip()
+            
+            parsed_data = json.loads(response_text)
+            
+            # Validate required fields
+            title = parsed_data.get('title', request.query[:80])
+            summary = parsed_data.get('summary', '')
+            steps = parsed_data.get('steps', [])
+            template = parsed_data.get('template')
+            
+            # Ensure we have steps
+            if not steps or len(steps) == 0:
+                steps = [
+                    "Review the relevant laws and regulations",
+                    "Gather all necessary documentation",
+                    "Consult with appropriate authorities if needed",
+                    "Follow prescribed legal procedures"
+                ]
+            
+        except (json.JSONDecodeError, KeyError) as e:
+            logger.warning(f"Failed to parse JSON response: {e}. Using fallback parsing.")
+            
+            # Fallback: Basic text parsing
+            lines = response_text.split('\n')
+            title = request.query[:80] if len(request.query) <= 80 else request.query[:77] + "..."
+            
+            # Extract summary (first paragraph)
+            summary_lines = []
+            for line in lines:
+                cleaned = line.strip()
+                if cleaned and not cleaned.startswith(('#', '-', '1.', '2.', '3.', '4.', '5.')):
+                    summary_lines.append(cleaned)
+                    if len(' '.join(summary_lines)) > 150:
+                        break
+            summary = ' '.join(summary_lines[:3]) if summary_lines else response_text[:200]
+            
+            # Extract steps
+            steps = []
+            for line in lines:
+                cleaned = line.strip()
+                if cleaned.startswith(('1.', '2.', '3.', '4.', '5.', '-', '•')):
+                    steps.append(cleaned.lstrip('123456789.-•').strip())
+            
+            if not steps:
+                steps = [
+                    "Review the relevant laws and regulations",
+                    "Gather all necessary documentation",
+                    "Consult with appropriate authorities if needed",
+                    "Follow prescribed legal procedures"
+                ]
+            
+            template = None
         
         result = AskResponse(
-            title=title,
+            title=title[:80],
             summary=summary,
             steps=steps[:5],
             sources=sources,
-            template=None
+            template=template
         )
         
         # Log the query
@@ -340,9 +400,14 @@ Format your response as a structured answer."""
         
         return result
         
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Ask error: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to process query: {str(e)}")
+        logger.error(f"Ask error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, 
+            detail="An error occurred while processing your question. Please try again."
+        )
 
 # ====== Wallet Routes ======
 
