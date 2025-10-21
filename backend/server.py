@@ -249,17 +249,17 @@ async def logout(request: Request, response: Response):
 async def ask_question(request: Request, ask_request: AskRequest):
     """AI-powered legal Q&A with citations (Rate limited: 10 requests/minute)"""
     try:
-        user = await get_user_from_cookie(req)
+        user = await get_user_from_cookie(request)
         
         # Validate input
-        if not request.query or len(request.query.strip()) == 0:
+        if not ask_request.query or len(ask_request.query.strip()) == 0:
             raise HTTPException(status_code=400, detail="Query cannot be empty")
         
-        if len(request.query) > 1000:
+        if len(ask_request.query) > 1000:
             raise HTTPException(status_code=400, detail="Query too long (max 1000 characters)")
         
         # Search for relevant sources
-        sources = await search_web_for_legal_info(request.query, request.context.get('useCase'))
+        sources = await search_web_for_legal_info(ask_request.query, ask_request.context.get('useCase'))
         
         # Prepare system prompt with JSON output instruction
         system_prompt = """You are Adhikaar.ai, an AI legal assistant for India. Your role is to:
