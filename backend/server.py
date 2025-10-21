@@ -128,20 +128,55 @@ async def get_user_from_cookie(request: Request) -> Optional[User]:
     return None
 
 async def search_web_for_legal_info(query: str, use_case: Optional[str] = None) -> List[Dict[str, str]]:
-    """Mock web search function - returns predefined sources"""
-    sources = [
-        {"title": "India Code - Central Acts", "url": "https://www.indiacode.nic.in/", "type": "Gov"},
-        {"title": "Ministry of Law & Justice", "url": "https://lawmin.gov.in/", "type": "Gov"},
+    """Search for legal information using Google Custom Search or return general resources"""
+    
+    # General legal resources (fallback)
+    general_sources = [
+        {"title": "India Code - Central Acts", "url": "https://www.indiacode.nic.in/", "type": "General Resource"},
+        {"title": "Ministry of Law & Justice", "url": "https://lawmin.gov.in/", "type": "General Resource"},
+        {"title": "Supreme Court of India", "url": "https://main.sci.gov.in/", "type": "General Resource"},
     ]
     
-    if use_case == "traffic":
-        sources.append({"title": "Motor Vehicles Act, 1988", "url": "https://www.indiacode.nic.in/", "type": "Act"})
-    elif use_case == "consumer":
-        sources.append({"title": "Consumer Protection Act, 2019", "url": "https://consumeraffairs.nic.in/", "type": "Act"})
-    elif use_case == "police":
-        sources.append({"title": "Code of Criminal Procedure, 1973", "url": "https://www.indiacode.nic.in/", "type": "Act"})
+    # If Google API key is configured, perform real search
+    if GOOGLE_API_KEY and GOOGLE_CSE_ID:
+        try:
+            service = build("customsearch", "v1", developerKey=GOOGLE_API_KEY)
+            
+            # Add India legal context to search
+            search_query = f"{query} India law legal"
+            
+            result = service.cse().list(
+                q=search_query,
+                cx=GOOGLE_CSE_ID,
+                num=5
+            ).execute()
+            
+            if 'items' in result:
+                sources = []
+                for item in result['items'][:5]:
+                    sources.append({
+                        "title": item.get('title', 'Untitled'),
+                        "url": item.get('link', ''),
+                        "type": "Search Result",
+                        "snippet": item.get('snippet', '')[:200]
+                    })
+                
+                # Add general sources at the end
+                sources.extend(general_sources[:2])
+                return sources
+        except Exception as e:
+            logger.error(f"Google search error: {e}")
+            # Fall through to return general sources
     
-    return sources
+    # Return general resources with appropriate context
+    if use_case == "traffic":
+        general_sources.append({"title": "Motor Vehicles Act, 1988", "url": "https://www.indiacode.nic.in/", "type": "General Resource"})
+    elif use_case == "consumer":
+        general_sources.append({"title": "Consumer Protection Act, 2019", "url": "https://consumeraffairs.nic.in/", "type": "General Resource"})
+    elif use_case == "police":
+        general_sources.append({"title": "Code of Criminal Procedure, 1973", "url": "https://www.indiacode.nic.in/", "type": "General Resource"})
+    
+    return general_sources
 
 # ====== Auth Routes ======
 
