@@ -158,6 +158,57 @@ backend:
         - working: true
           agent: "testing"
           comment: "POST /api/v1/ask endpoint is accessible and returns HTTP 200. Accepts proper JSON payload with query, lang, and context fields. CORS and routing configured correctly."
+        - working: true
+          agent: "testing"
+          comment: "CONFIRMED: Endpoint fully accessible at /api/v1/ask with proper CORS configuration. All test scenarios (traffic, consumer, police, general) working correctly. Response times 4-6 seconds which is acceptable for AI processing."
+
+  - task: "Rate Limiting Implementation"
+    implemented: true
+    working: false
+    file: "/app/backend/server.py"
+    stuck_count: 1
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        - working: false
+          agent: "testing"
+          comment: "ISSUE: Rate limiting configured as 10/minute but not enforcing limits. All 11 consecutive requests return HTTP 200 instead of 11th returning 429. Slowapi configuration appears correct but may have issues in Kubernetes environment where all requests appear from same internal IP. Needs investigation of key_func configuration."
+
+  - task: "Error Handling Validation"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "WORKING: Error handling properly implemented. Empty query returns 400 with clear message 'Query cannot be empty'. Too long query (>1000 chars) returns 400 with 'Query too long' message. Missing query field returns 422 with proper validation error. All error responses include clear, actionable messages."
+
+  - task: "Web Search Integration"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "WORKING: Web search integration functional. Returns 3-5 sources as expected. Sources properly labeled as 'General Resource' (fallback mode since Google API keys not configured for real search). All sources include required fields: title, url, type. URL validation working correctly. Context-aware source selection working (consumer queries get Consumer Protection Act sources)."
+
+  - task: "AI Response Parsing"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "WORKING: AI response parsing fully functional. JSON structure validation confirmed - all required fields (title, summary, steps, sources, updated) present with correct data types. Fallback parsing works when JSON parsing fails. Response content is meaningful legal guidance with actionable steps, not just truncated text. Template field properly handled as optional."
 
 frontend:
   - task: "Frontend Integration Testing"
