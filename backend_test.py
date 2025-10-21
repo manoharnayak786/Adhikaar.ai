@@ -391,6 +391,202 @@ class BackendTester:
         except Exception as e:
             self.log_result(test_name, False, f"Error: {str(e)}")
 
+    def test_rate_limiting(self):
+        """Test rate limiting - 10 requests per minute limit"""
+        test_name = "Rate Limiting Test"
+        
+        try:
+            payload = {
+                "query": "What are traffic rules in India?",
+                "lang": "en",
+                "context": {"useCase": "traffic"}
+            }
+            
+            # Make 11 consecutive requests
+            responses = []
+            for i in range(11):
+                try:
+                    response = self.session.post(
+                        f"{API_BASE}/ask",
+                        json=payload,
+                        headers={"Content-Type": "application/json"},
+                        timeout=10
+                    )
+                    responses.append({
+                        "request_num": i + 1,
+                        "status_code": response.status_code,
+                        "headers": dict(response.headers)
+                    })
+                    
+                    # Small delay between requests
+                    time.sleep(0.1)
+                    
+                except Exception as e:
+                    responses.append({
+                        "request_num": i + 1,
+                        "error": str(e)
+                    })
+            
+            # Check if 11th request was rate limited
+            eleventh_request = responses[10] if len(responses) > 10 else None
+            
+            if eleventh_request and eleventh_request.get("status_code") == 429:
+                # Check for rate limit headers
+                headers = eleventh_request.get("headers", {})
+                has_rate_limit_headers = any(
+                    header.lower().startswith(('x-ratelimit', 'retry-after'))
+                    for header in headers.keys()
+                )
+                
+                self.log_result(test_name, True, "Rate limiting working correctly - 11th request returned 429", {
+                    "eleventh_request_status": eleventh_request.get("status_code"),
+                    "has_rate_limit_headers": has_rate_limit_headers,
+                    "successful_requests": sum(1 for r in responses[:10] if r.get("status_code") == 200)
+                })
+            else:
+                self.log_result(test_name, False, "Rate limiting not working - 11th request should return 429", {
+                    "eleventh_request": eleventh_request,
+                    "all_responses": [r.get("status_code") for r in responses]
+                })
+                
+        except Exception as e:
+            self.log_result(test_name, False, f"Error: {str(e)}")
+
+    def test_error_handling(self):
+        """Test error handling for invalid inputs"""
+        test_name = "Error Handling Test"
+        
+        error_tests = [
+            {
+                "name": "Empty Query",
+                "payload": {"query": "", "lang": "en", "context": {}},
+                "expected_status": 400
+            },
+            {
+                "name": "Too Long Query",
+                "payload": {"query": "x" * 1001, "lang": "en", "context": {}},
+                "expected_status": 400
+            },
+            {
+                "name": "Missing Query Field",
+                "payload": {"lang": "en", "context": {}},
+                "expected_status": 422
+            }
+        ]
+        
+        all_passed = True
+        results = []
+        
+        for test in error_tests:
+            try:
+                response = self.session.post(
+                    f"{API_BASE}/ask",
+                    json=test["payload"],
+                    headers={"Content-Type": "application/json"},
+                    timeout=10
+                )
+                
+                if response.status_code == test["expected_status"]:
+                    results.append(f"✅ {test['name']}: Correct {response.status_code} status")
+                    
+                    # Check if error message is clear
+                    try:
+                        error_data = response.json()
+                        if "detail" in error_data and len(str(error_data["detail"])) > 0:
+                            results.append(f"   Clear error message provided")
+                        else:
+                            results.append(f"   ⚠️ Error message could be clearer")
+                    except:
+                        results.append(f"   ⚠️ No JSON error response")
+                else:
+                    results.append(f"❌ {test['name']}: Expected {test['expected_status']}, got {response.status_code}")
+                    all_passed = False
+                    
+            except Exception as e:
+                results.append(f"❌ {test['name']}: Exception - {str(e)}")
+                all_passed = False
+        
+        if all_passed:
+            self.log_result(test_name, True, "All error handling tests passed", {"results": results})
+        else:
+            self.log_result(test_name, False, "Some error handling tests failed", {"results": results})
+
+    def test_web_search_integration(self):
+        """Test web search integration and source labeling"""
+        test_name = "Web Search Integration Test"
+        
+        try:
+            payload = {
+                "query": "What are consumer protection laws in India?",
+                "lang": "en",
+                "context": {"useCase": "consumer"}
+            }
+            
+            response = self.session.post(
+                f"{API_BASE}/ask",
+                json=payload,
+                headers={"Content-Type": "application/json"},
+                timeout=15
+            )
+            
+            if response.status_code != 200:
+                self.log_result(test_name, False, f"HTTP {response.status_code}: {response.text}")
+                return
+            
+            data = response.json()
+            sources = data.get("sources", [])
+            
+            # Check source count
+            if len(sources) < 3:
+                self.log_result(test_name, False, f"Insufficient sources returned: {len(sources)} (expected 3-5)", {
+                    "sources": sources
+                })
+                return
+            
+            # Check source structure and labeling
+            source_issues = []
+            search_results = 0
+            general_resources = 0
+            
+            for i, source in enumerate(sources):
+                # Check required fields
+                required_fields = ["title", "url", "type"]
+                missing_fields = [field for field in required_fields if field not in source]
+                if missing_fields:
+                    source_issues.append(f"Source {i+1} missing fields: {missing_fields}")
+                
+                # Check source type labeling
+                source_type = source.get("type", "")
+                if source_type == "Search Result":
+                    search_results += 1
+                elif source_type == "General Resource":
+                    general_resources += 1
+                else:
+                    source_issues.append(f"Source {i+1} has invalid type: '{source_type}'")
+                
+                # Check URL validity
+                url = source.get("url", "")
+                if not url.startswith(("http://", "https://")):
+                    source_issues.append(f"Source {i+1} has invalid URL: {url}")
+            
+            # Evaluate results
+            if source_issues:
+                self.log_result(test_name, False, f"Source validation issues: {'; '.join(source_issues)}", {
+                    "sources": sources,
+                    "search_results": search_results,
+                    "general_resources": general_resources
+                })
+            else:
+                self.log_result(test_name, True, f"Web search integration working correctly", {
+                    "total_sources": len(sources),
+                    "search_results": search_results,
+                    "general_resources": general_resources,
+                    "source_types_valid": True
+                })
+                
+        except Exception as e:
+            self.log_result(test_name, False, f"Error: {str(e)}")
+
     def run_all_tests(self):
         """Run all backend tests"""
         print("🚀 Starting Adhikaar.ai Backend AI Integration Tests")
